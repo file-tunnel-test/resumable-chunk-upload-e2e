@@ -19,7 +19,7 @@ Source organization: `file-tunnel`
 | Source | Commit | Branch observed |
 |---|---:|---|
 | `file-tunnel/ftnl-backend-api.rs` | `3b98c7999df69ee9165a792644591799a70c23bc` | `main` |
-| `file-tunnel/ftnl-clients` | `101ba85ef7090a9baf9ca48bd48503bc23e36ea9` | `main` |
+| `file-tunnel/ftnl-clients` | `07f39d9c0a2006eda6068b476e692d0ec1fcddd7` | `main` |
 
 ## Dependency lanes
 
