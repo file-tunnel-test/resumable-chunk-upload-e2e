@@ -7,12 +7,23 @@ on:
     paths:
       - '.bootstrap/den-3431/**'
       - '.github/workflows/bootstrap-den-3431.yml'
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths:
+      - '.bootstrap/den-3431/**'
+      - '.github/workflows/bootstrap-den-3431.yml'
 
 permissions:
   contents: write
 
 jobs:
   assemble:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
