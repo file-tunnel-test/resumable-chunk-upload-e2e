@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://file-tunnel.test/schemas/object-storage-evidence-v1.json",
+  "title": "File Tunnel independent object-storage certification evidence",
+  "type": "object",
+  "required": [
+    "schema",
+    "policyVersion",
+    "exactHeadSha",
+    "sourcePins",
+    "sourceDigest",
+    "configDigest",
+    "providerMode",
+    "credentialsUsed",
+    "integrity",
+    "resume",
+    "lifecycle",
+    "isolation",
+    "resourceBounds",
+    "evidenceDigest"
+  ],
+  "properties": {
+    "schema": { "const": "file-tunnel-test/object-storage-evidence/v1" },
+    "policyVersion": { "const": "den-3431/v1" },
+    "exactHeadSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sourceDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "configDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "evidenceDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "providerMode": { "const": "local-synthetic" },
+    "credentialsUsed": { "const": false },
+    "rawIdentifiersRetained": { "const": false },
+    "rawContentRetained": { "const": false }
+  },
+  "additionalProperties": true
+}
