@@ -459,6 +459,7 @@ export class LocalObjectStore {
   issueReadCapability({ tenant, bucket, objectId, range = null }) {
     const object = this._object(tenant, bucket, objectId);
     if (object.tenant !== tenant) throw new StoreError('TENANT_SCOPE');
+    const authorizedRange = range ?? { start: 0, endExclusive: object.contentLength };
     const claims = {
       version: 1,
       kind: 'read',
@@ -466,7 +467,7 @@ export class LocalObjectStore {
       bucket,
       objectId,
       stateVersion: object.stateVersion,
-      range,
+      range: authorizedRange,
       expiresAtMs: this.clock.now() + this.capabilityTtlMs,
     };
     return this._signClaims(claims);
