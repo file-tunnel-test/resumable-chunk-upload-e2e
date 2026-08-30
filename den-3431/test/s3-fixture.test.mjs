@@ -71,4 +71,14 @@ test('loopback S3-style multipart facade preserves capability, range, and tenant
     },
   });
   assert.equal(crossTenant.status, 404);
+
+  const fullReadCapability = store.issueReadCapability({ tenant, bucket, objectId });
+  const fullResponse = await fetch(objectUrl, {
+    headers: {
+      'x-ftnl-tenant': tenant,
+      'x-ftnl-capability': fullReadCapability,
+    },
+  });
+  assert.equal(fullResponse.status, 200);
+  assert.deepEqual(Buffer.from(await fullResponse.arrayBuffer()), bytes);
 });
