@@ -1,0 +1,13 @@
+{
+  "schema": "file-tunnel-test/source-pins/v1",
+  "sources": [
+    {
+      "repository": "file-tunnel/ftnl-backend-api.rs",
+      "sha": "f33d79896584a4a2fa4dcde88f0cd4cf863e11cb"
+    },
+    {
+      "repository": "file-tunnel/ftnl-clients",
+      "sha": "dfd339f238932b7ed209b677916f9fcb8d249670"
+    }
+  ]
+}
