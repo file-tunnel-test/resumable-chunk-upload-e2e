@@ -93,6 +93,25 @@ function ensureText(value, label) {
   return value;
 }
 
+function ensureObjectKey(value) {
+  if (typeof value !== 'string' || value.length < 1 || value.length > 512) {
+    throw new StoreError('INVALID_IDENTIFIER', 'objectId is invalid');
+  }
+  const segments = value.split('/');
+  if (
+    segments.some(
+      (segment) =>
+        segment.length < 1 ||
+        segment === '.' ||
+        segment === '..' ||
+        !/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(segment),
+    )
+  ) {
+    throw new StoreError('INVALID_IDENTIFIER', 'objectId is invalid');
+  }
+  return value;
+}
+
 function ensureDigest(value, label = 'digest') {
   if (typeof value !== 'string' || !/^sha256:[0-9a-f]{64}$/.test(value)) {
     throw new StoreError('INVALID_DIGEST', `${label} must be sha256`);
@@ -264,7 +283,7 @@ export class LocalObjectStore {
   }) {
     tenant = ensureText(tenant, 'tenant');
     bucket = ensureText(bucket, 'bucket');
-    objectId = ensureText(objectId, 'objectId');
+    objectId = ensureObjectKey(objectId);
     ensureDigest(expectedDigest, 'expectedDigest');
     if (!Number.isSafeInteger(expectedPartCount) || expectedPartCount < 1 || expectedPartCount > this.maxParts) {
       throw new StoreError('INVALID_PART_COUNT');
@@ -272,6 +291,9 @@ export class LocalObjectStore {
     if (!Number.isSafeInteger(keyVersion) || keyVersion < 1) throw new StoreError('INVALID_KEY_VERSION');
     if (!Number.isSafeInteger(retentionUntilMs) || !Number.isSafeInteger(expiresAtMs)) {
       throw new StoreError('INVALID_TIMESTAMP');
+    }
+    if (!['client-side-aes-256-gcm', 'server-side-provider-managed'].includes(encryptionMode)) {
+      throw new StoreError('INVALID_ENCRYPTION_MODE');
     }
     const encryptionContext = {
       mode: encryptionMode,
@@ -313,6 +335,7 @@ export class LocalObjectStore {
       capability: this._issueUploadCapability(upload),
       intentDigest: upload.intentDigest,
       encryptionContextDigest: upload.encryptionContextDigest,
+      encryptionMode: upload.encryptionContext.mode,
     };
   }
 
@@ -463,6 +486,7 @@ export class LocalObjectStore {
       intentDigest: upload.intentDigest,
       expectedDigest: upload.expectedDigest,
       encryptionContextDigest: upload.encryptionContextDigest,
+      encryptionMode: upload.encryptionContext.mode,
       keyVersion: upload.keyVersion,
       algorithm: 'AES-256-GCM',
       parts: new Map(upload.parts),
@@ -483,6 +507,7 @@ export class LocalObjectStore {
       replayed: false,
       objectDigest: computed,
       metadata: {
+        encryptionMode: object.encryptionMode,
         algorithm: object.algorithm,
         keyVersion: object.keyVersion,
         encryptionContextDigest: object.encryptionContextDigest,
@@ -603,7 +628,7 @@ export class LocalObjectStore {
       .map((part) => [part.partNumber, this._decryptPart(object, part)]);
     object.keyVersion = newKeyVersion;
     object.encryptionContextDigest = sha256(canonicalJson({
-      mode: 'client-side-aes-256-gcm',
+      mode: object.encryptionMode,
       algorithm: 'AES-256-GCM',
       keyVersion: newKeyVersion,
       aadVersion: 1,

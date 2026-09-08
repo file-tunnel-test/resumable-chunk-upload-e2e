@@ -9,6 +9,8 @@ public final class Verify {
     require(text.contains("\"reorderedPartRejected\":true"), "reordered part");
     require(text.contains("\"expiredCapabilityRejected\":true"), "expired capability");
     require(text.contains("\"wrongEtagRejected\":true"), "wrong ETag");
+    require(text.contains("\"serverModeMetadataVerified\":true"), "server encryption metadata");
+    require(text.contains("\"crossPrefixReadRejected\":true"), "prefix isolation");
     require(text.contains("\"partialResponses\":1"), "partial response fault");
     require(text.contains("\"finalDeletionEvidence\":\"verified\""), "deletion");
     require(text.contains("\"tenantScopedCleanup\":true"), "tenant cleanup");

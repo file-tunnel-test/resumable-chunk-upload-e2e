@@ -10,9 +10,11 @@ The suite proves:
 - exact replay/idempotency, stale capability rejection, ordered multipart completion, and disconnect recovery;
 - expired/stale request rejection, completion ETag binding, and truncated-object failure;
 - range authorization and authenticated partial reads;
+- explicit client-side and provider-managed encryption metadata without raw key material;
 - key-version rotation without persisting raw keys;
 - legal hold, retention, soft delete, tombstone, hard delete, and verified deletion evidence;
 - negative tenant, object, capability, and cleanup scope;
+- S3-style prefix isolation, including nested object keys;
 - bounded part and working-set limits;
 - deterministic disconnect, retry, delay, stale-listing, and partial-response faults;
 - 64 deterministic model-based lifecycle traces covering 1,536 valid and invalid transition steps;

@@ -41,8 +41,8 @@ function errorStatus(error) {
 
 function parsePath(url) {
   const parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
-  if (parts.length !== 2) throw new StoreError('INVALID_IDENTIFIER');
-  return { bucket: parts[0], objectId: parts[1] };
+  if (parts.length < 2) throw new StoreError('INVALID_IDENTIFIER');
+  return { bucket: parts[0], objectId: parts.slice(1).join('/') };
 }
 
 export async function startS3Fixture({ store = new LocalObjectStore(), host = '127.0.0.1', port = 0 } = {}) {
@@ -61,6 +61,9 @@ export async function startS3Fixture({ store = new LocalObjectStore(), host = '1
           expectedDigest: String(request.headers['x-ftnl-expected-sha256'] ?? ''),
           expectedPartCount: Number(request.headers['x-ftnl-part-count']),
           keyVersion: Number(request.headers['x-ftnl-key-version'] ?? 1),
+          encryptionMode: String(
+            request.headers['x-ftnl-encryption-mode'] ?? 'client-side-aes-256-gcm',
+          ),
           retentionUntilMs: Number(request.headers['x-ftnl-retention-until-ms'] ?? store.clock.now()),
           legalHold: request.headers['x-ftnl-legal-hold'] === 'true',
         });

@@ -34,7 +34,7 @@ export async function runCertification({ sourcePinsPath, exactHeadSha = '0'.repe
   const tenantA = 'tenant-a';
   const tenantB = 'tenant-b';
   const bucket = 'fixture-bucket';
-  const objectId = 'synthetic-object';
+  const objectId = 'prefix-a/synthetic-object';
   const content = Buffer.from('synthetic-only:' + '0123456789abcdef'.repeat(90));
   const expectedDigest = sha256(content);
   const parts = [content.subarray(0, 512), content.subarray(512, 1024), content.subarray(1024)];
@@ -278,7 +278,16 @@ export async function runCertification({ sourcePinsPath, exactHeadSha = '0'.repe
     store.readRange({
       tenant: tenantA,
       bucket,
-      objectId: 'other-object',
+      objectId: 'prefix-a/other-object',
+      capability: readCapability,
+      ...range,
+    }),
+  );
+  const crossPrefixRead = await expectCode('OBJECT_NOT_FOUND', () =>
+    store.readRange({
+      tenant: tenantA,
+      bucket,
+      objectId: 'prefix-b/synthetic-object',
       capability: readCapability,
       ...range,
     }),
@@ -434,6 +443,42 @@ export async function runCertification({ sourcePinsPath, exactHeadSha = '0'.repe
     capability: singleReadCapability,
   });
 
+  const invalidEncryptionMode = await expectCode('INVALID_ENCRYPTION_MODE', () =>
+    singleStore.beginUpload({
+      tenant: tenantA,
+      bucket,
+      objectId: 'invalid-encryption-object',
+      expectedDigest: sha256('invalid-encryption'),
+      expectedPartCount: 1,
+      encryptionMode: 'unknown-mode',
+    }),
+  );
+  const serverBytes = Buffer.from('server-side-provider-object');
+  const server = singleStore.beginUpload({
+    tenant: tenantA,
+    bucket,
+    objectId: 'server-mode-object',
+    expectedDigest: sha256(serverBytes),
+    expectedPartCount: 1,
+    encryptionMode: 'server-side-provider-managed',
+    keyVersion: 7,
+  });
+  const serverPart = singleStore.uploadPart({
+    tenant: tenantA,
+    uploadId: server.uploadId,
+    capability: server.capability,
+    partNumber: 1,
+    bytes: serverBytes,
+  });
+  const serverCompletion = singleStore.complete({
+    tenant: tenantA,
+    uploadId: server.uploadId,
+    capability: serverPart.capability,
+    expectedDigest: sha256(serverBytes),
+    expectedPartCount: 1,
+    expectedPartEtags: [serverPart.etag],
+  });
+
   const truncatedStore = new LocalObjectStore({ maxPartBytes: 64 });
   const truncated = truncatedStore.beginUpload({
     tenant: tenantA,
@@ -555,6 +600,20 @@ export async function runCertification({ sourcePinsPath, exactHeadSha = '0'.repe
       singlePartVerified: singleRead.equals(singleBytes),
       keyRotationVerified: rotation.keyVersion === 2,
     },
+    encryption: {
+      clientModeMetadataVerified:
+        completion.metadata.encryptionMode === 'client-side-aes-256-gcm' &&
+        completion.metadata.algorithm === 'AES-256-GCM' &&
+        completion.metadata.keyVersion === 1,
+      serverModeMetadataVerified:
+        serverCompletion.metadata.encryptionMode === 'server-side-provider-managed' &&
+        serverCompletion.metadata.algorithm === 'AES-256-GCM' &&
+        serverCompletion.metadata.keyVersion === 7,
+      invalidModeRejected: invalidEncryptionMode === 'INVALID_ENCRYPTION_MODE',
+      rawKeyExcluded:
+        !Object.hasOwn(completion.metadata, 'key') &&
+        !Object.hasOwn(serverCompletion.metadata, 'key'),
+    },
     resume: {
       exactReplayIdempotent: replay.replayed === true,
       duplicateCompletionIdempotent: duplicateCompletion.replayed === true,
@@ -587,6 +646,7 @@ export async function runCertification({ sourcePinsPath, exactHeadSha = '0'.repe
       crossTenantReadRejected: crossTenantRead === 'OBJECT_NOT_FOUND',
       crossBucketReadRejected: crossBucketRead === 'OBJECT_NOT_FOUND',
       crossObjectReadRejected: crossObjectRead === 'OBJECT_NOT_FOUND',
+      crossPrefixReadRejected: crossPrefixRead === 'OBJECT_NOT_FOUND',
       foreignUploadCapabilityRejected:
         foreignUploadCapability === 'CAPABILITY_CONTEXT_MISMATCH' && foreignResume.nextPartNumber === 1,
       staleReadCapabilityRejected: staleReadCapability === 'STALE_CAPABILITY',

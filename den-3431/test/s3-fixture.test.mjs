@@ -11,7 +11,7 @@ test('loopback S3-style multipart facade preserves capability, range, and tenant
   t.after(fixture.close);
   const tenant = 'tenant-http';
   const bucket = 'bucket-http';
-  const objectId = 'object-http';
+  const objectId = 'prefix-a/object-http';
   const bytes = Buffer.from('0123456789abcdef'.repeat(6));
   const chunks = [bytes.subarray(0, 32), bytes.subarray(32, 64), bytes.subarray(64)];
   const expectedDigest = sha256(bytes);
@@ -95,6 +95,15 @@ test('loopback S3-style multipart facade preserves capability, range, and tenant
     },
   });
   assert.equal(crossTenant.status, 404);
+
+  const crossPrefix = await fetch(`${fixture.origin}/${bucket}/prefix-b/object-http`, {
+    headers: {
+      'x-ftnl-tenant': tenant,
+      'x-ftnl-capability': readCapability,
+      range: `bytes=${range.start}-${range.endExclusive - 1}`,
+    },
+  });
+  assert.equal(crossPrefix.status, 404);
 
   const fullReadCapability = store.issueReadCapability({ tenant, bucket, objectId });
   const fullResponse = await fetch(objectUrl, {
