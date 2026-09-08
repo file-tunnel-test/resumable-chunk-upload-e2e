@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2, Node 24
         with:
           repository: file-tunnel/ftnl-backend-api.rs
-          ref: f33d79896584a4a2fa4dcde88f0cd4cf863e11cb
+          ref: 8b9be5ce229d46e097ce45c58f906ea17481e57b
           path: source/backend
           persist-credentials: false
           show-progress: false
@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2, Node 24
         with:
           repository: file-tunnel/ftnl-clients
-          ref: dfd339f238932b7ed209b677916f9fcb8d249670
+          ref: 8c24b8bacae16e30ce33186d5531cfe92d7cc7ab
           path: source/clients
           persist-credentials: false
           show-progress: false
@@ -53,8 +53,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
-          test "$(git -C source/backend rev-parse HEAD)" = f33d79896584a4a2fa4dcde88f0cd4cf863e11cb
-          test "$(git -C source/clients rev-parse HEAD)" = dfd339f238932b7ed209b677916f9fcb8d249670
+          test "$(git -C source/backend rev-parse HEAD)" = 8b9be5ce229d46e097ce45c58f906ea17481e57b
+          test "$(git -C source/clients rev-parse HEAD)" = 8c24b8bacae16e30ce33186d5531cfe92d7cc7ab
           node -e '
             const p=require("./den-3431/source-pins.json");
             if(p.schema!=="file-tunnel-test/source-pins/v1"||p.sources.length!==2)process.exit(1);
@@ -82,7 +82,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -ERn 'X-Amz-(Credential|Signature)|Authorization: Bearer|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|synthetic-only:|fixture-bucket|synthetic-object|tenant-a|tenant-b' evidence
+          if grep -ERn 'X-Amz-(Credential|Signature)|Authorization: Bearer|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|synthetic-only:|fixture-bucket|synthetic-object|tenant-a|tenant-b' evidence; then
+            echo 'forbidden sensitive or raw fixture value retained in evidence' >&2
+            exit 1
+          fi
           test "$(find evidence -type f | wc -l)" -eq 1
       - name: Upload exact-head evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, Node 24

@@ -80,7 +80,7 @@ export async function startS3Fixture({ store = new LocalObjectStore(), host = '1
           inventoryDigest: result.inventoryDigest,
         }, {
           'x-ftnl-next-capability': result.capability,
-          etag: `"${result.inventoryDigest}"`,
+          etag: `"${result.etag}"`,
         });
         return;
       }
@@ -95,6 +95,7 @@ export async function startS3Fixture({ store = new LocalObjectStore(), host = '1
           capability,
           expectedDigest: body.expectedDigest,
           expectedPartCount: body.expectedPartCount,
+          expectedPartEtags: body.expectedPartEtags ?? null,
         });
         json(response, 200, result);
         return;
