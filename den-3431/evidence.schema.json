@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://file-tunnel.test/schemas/object-storage-evidence-v1.json",
+  "$id": "https://file-tunnel.test/schemas/object-storage-evidence-v2.json",
   "title": "File Tunnel independent object-storage certification evidence",
   "type": "object",
   "required": [
@@ -9,27 +9,201 @@
     "exactHeadSha",
     "sourcePins",
     "sourceDigest",
+    "config",
     "configDigest",
     "providerMode",
     "credentialsUsed",
+    "rawIdentifiersRetained",
+    "rawContentRetained",
     "integrity",
     "resume",
     "lifecycle",
     "isolation",
     "resourceBounds",
+    "faultInjection",
+    "redactedIdentifiers",
     "evidenceDigest"
   ],
   "properties": {
-    "schema": { "const": "file-tunnel-test/object-storage-evidence/v1" },
-    "policyVersion": { "const": "den-3431/v1" },
-    "exactHeadSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "sourceDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "configDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "evidenceDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "schema": { "const": "file-tunnel-test/object-storage-evidence/v2" },
+    "policyVersion": { "const": "den-3431/v2" },
+    "exactHeadSha": { "$ref": "#/$defs/sha" },
+    "sourcePins": { "type": "object" },
+    "sourceDigest": { "$ref": "#/$defs/digest" },
+    "config": { "type": "object" },
+    "configDigest": { "$ref": "#/$defs/digest" },
+    "evidenceDigest": { "$ref": "#/$defs/digest" },
     "providerMode": { "const": "local-synthetic" },
     "credentialsUsed": { "const": false },
     "rawIdentifiersRetained": { "const": false },
-    "rawContentRetained": { "const": false }
+    "rawContentRetained": { "const": false },
+    "integrity": {
+      "type": "object",
+      "required": [
+        "plaintextDigestVerified",
+        "ciphertextDigestVerified",
+        "authenticationTagVerified",
+        "tamperDetected",
+        "nonceTamperDetected",
+        "metadataTamperDetected",
+        "wrongCompletionDigestRejected",
+        "wrongEtagRejected",
+        "truncatedObjectRejected",
+        "truncatedFailureNonMutating",
+        "rangeVerified",
+        "downloadDigestVerified",
+        "partialResponseRejected",
+        "singlePartVerified",
+        "keyRotationVerified"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "plaintextDigestVerified": { "const": true },
+        "ciphertextDigestVerified": { "const": true },
+        "authenticationTagVerified": { "const": true },
+        "tamperDetected": { "const": true },
+        "nonceTamperDetected": { "const": true },
+        "metadataTamperDetected": { "const": true },
+        "wrongCompletionDigestRejected": { "const": true },
+        "wrongEtagRejected": { "const": true },
+        "truncatedObjectRejected": { "const": true },
+        "truncatedFailureNonMutating": { "const": true },
+        "rangeVerified": { "const": true },
+        "downloadDigestVerified": { "const": true },
+        "partialResponseRejected": { "const": true },
+        "singlePartVerified": { "const": true },
+        "keyRotationVerified": { "const": true }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "required": [
+        "exactReplayIdempotent",
+        "duplicateCompletionIdempotent",
+        "duplicateCompletionContextRejected",
+        "staleCapabilityRejected",
+        "stalePresignedRequestRejected",
+        "expiredCapabilityRejected",
+        "digestMismatchRejected",
+        "encryptionContextMismatchRejected",
+        "conflictingReplayRejected",
+        "reorderedPartRejected",
+        "injectedDisconnectRecovered",
+        "inventoryDigestBound"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "exactReplayIdempotent": { "const": true },
+        "duplicateCompletionIdempotent": { "const": true },
+        "duplicateCompletionContextRejected": { "const": true },
+        "staleCapabilityRejected": { "const": true },
+        "stalePresignedRequestRejected": { "const": true },
+        "expiredCapabilityRejected": { "const": true },
+        "digestMismatchRejected": { "const": true },
+        "encryptionContextMismatchRejected": { "const": true },
+        "conflictingReplayRejected": { "const": true },
+        "reorderedPartRejected": { "const": true },
+        "injectedDisconnectRecovered": { "const": true },
+        "inventoryDigestBound": { "const": true }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "required": [
+        "legalHold",
+        "retention",
+        "softDelete",
+        "tombstone",
+        "hardDelete",
+        "finalDeletionEvidence",
+        "invalidTransitionRejected",
+        "terminalReadRejected"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "legalHold": { "const": "pending" },
+        "retention": { "const": "pending" },
+        "softDelete": { "const": "requested" },
+        "tombstone": { "const": "tombstoned" },
+        "hardDelete": { "const": "verified" },
+        "finalDeletionEvidence": { "const": "verified" },
+        "invalidTransitionRejected": { "const": true },
+        "terminalReadRejected": { "const": true }
+      }
+    },
+    "isolation": {
+      "type": "object",
+      "required": [
+        "tenantResumeRejected",
+        "crossTenantReadRejected",
+        "crossBucketReadRejected",
+        "crossObjectReadRejected",
+        "foreignUploadCapabilityRejected",
+        "staleReadCapabilityRejected",
+        "tenantScopedCleanup",
+        "namespaceScopedCleanup",
+        "cacheIsolation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tenantResumeRejected": { "const": true },
+        "crossTenantReadRejected": { "const": true },
+        "crossBucketReadRejected": { "const": true },
+        "crossObjectReadRejected": { "const": true },
+        "foreignUploadCapabilityRejected": { "const": true },
+        "staleReadCapabilityRejected": { "const": true },
+        "tenantScopedCleanup": { "const": true },
+        "namespaceScopedCleanup": { "const": true },
+        "cacheIsolation": { "const": true }
+      }
+    },
+    "resourceBounds": {
+      "type": "object",
+      "required": ["maxPartBytes", "maxParts", "peakWorkingSetBytes", "bounded"],
+      "additionalProperties": false,
+      "properties": {
+        "maxPartBytes": { "type": "integer", "minimum": 1 },
+        "maxParts": { "type": "integer", "minimum": 1 },
+        "peakWorkingSetBytes": { "type": "integer", "minimum": 0 },
+        "bounded": { "const": true }
+      }
+    },
+    "faultInjection": {
+      "type": "object",
+      "required": ["disconnects", "retries", "delayedParts", "staleListings", "partialResponses"],
+      "additionalProperties": false,
+      "properties": {
+        "disconnects": { "const": 1 },
+        "retries": { "const": 1 },
+        "delayedParts": { "const": 1 },
+        "staleListings": { "const": 1 },
+        "partialResponses": { "const": 1 }
+      }
+    },
+    "redactedIdentifiers": {
+      "type": "object",
+      "required": [
+        "tenantDigest",
+        "bucketDigest",
+        "objectDigest",
+        "uploadDigest",
+        "intentDigest",
+        "encryptionContextDigest"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tenantDigest": { "$ref": "#/$defs/digest" },
+        "bucketDigest": { "$ref": "#/$defs/digest" },
+        "objectDigest": { "$ref": "#/$defs/digest" },
+        "uploadDigest": { "$ref": "#/$defs/digest" },
+        "intentDigest": { "$ref": "#/$defs/digest" },
+        "encryptionContextDigest": { "$ref": "#/$defs/digest" }
+      }
+    }
   },
-  "additionalProperties": true
+  "additionalProperties": false,
+  "$defs": {
+    "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
 }

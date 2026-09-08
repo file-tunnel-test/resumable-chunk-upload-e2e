@@ -6,8 +6,8 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 
-export const EVIDENCE_SCHEMA = 'file-tunnel-test/object-storage-evidence/v1';
-export const POLICY_VERSION = 'den-3431/v1';
+export const EVIDENCE_SCHEMA = 'file-tunnel-test/object-storage-evidence/v2';
+export const POLICY_VERSION = 'den-3431/v2';
 
 export class StoreError extends Error {
   constructor(code, message = code) {
@@ -49,6 +49,24 @@ export function canonicalJson(value) {
 export function sha256(value) {
   const bytes = Buffer.isBuffer(value) ? value : Buffer.from(String(value));
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+export function verifyDownloadedBytes({ bytes, expectedLength, expectedDigest }) {
+  if (!Buffer.isBuffer(bytes)) bytes = Buffer.from(bytes);
+  if (!Number.isSafeInteger(expectedLength) || expectedLength < 0) {
+    throw new StoreError('INVALID_RESPONSE_CONTRACT');
+  }
+  if (bytes.length !== expectedLength) throw new StoreError('PARTIAL_RESPONSE');
+  if (expectedDigest !== undefined) {
+    ensureDigest(expectedDigest, 'expectedDigest');
+    if (sha256(bytes) !== expectedDigest) throw new StoreError('RESPONSE_DIGEST_MISMATCH');
+  }
+  return bytes;
+}
+
+export function verifyInventoryDigest({ actual, expected }) {
+  if (actual !== expected) throw new StoreError('STALE_LISTING');
+  return actual;
 }
 
 function rawSha256(value) {
@@ -129,6 +147,7 @@ export class LocalObjectStore {
       maxPartBytes: this.maxPartBytes,
       maxParts: this.maxParts,
       capabilityTtlMs: this.capabilityTtlMs,
+      cache: 'disabled',
       encryption: {
         clientSide: 'AES-256-GCM',
         serverSide: 'provider-managed-metadata-only',
@@ -215,7 +234,7 @@ export class LocalObjectStore {
     if (claims.kind !== 'upload' || claims.version !== 1) {
       throw new StoreError('INVALID_CAPABILITY');
     }
-    if (claims.expiresAtMs < this.clock.now()) throw new StoreError('EXPIRED_CAPABILITY');
+    if (claims.expiresAtMs <= this.clock.now()) throw new StoreError('EXPIRED_CAPABILITY');
     if (claims.tenant !== tenant || upload.tenant !== tenant) throw new StoreError('TENANT_SCOPE');
     for (const key of ['bucket', 'objectId', 'uploadId', 'intentDigest', 'encryptionContextDigest', 'expectedDigest']) {
       if (claims[key] !== upload[key]) throw new StoreError('CAPABILITY_CONTEXT_MISMATCH');
@@ -334,6 +353,7 @@ export class LocalObjectStore {
       }
       return {
         replayed: true,
+        etag: existing.ciphertextDigest,
         nextPartNumber: upload.parts.size + 1,
         inventoryDigest: this._inventoryDigest(upload),
         capability: this._issueUploadCapability(upload),
@@ -363,6 +383,7 @@ export class LocalObjectStore {
     this.peakWorkingSetBytes = Math.max(this.peakWorkingSetBytes, bytes.length + ciphertext.length);
     return {
       replayed: false,
+      etag: sha256(ciphertext),
       nextPartNumber: upload.parts.size + 1,
       inventoryDigest: this._inventoryDigest(upload),
       capability: this._issueUploadCapability(upload),
@@ -389,12 +410,25 @@ export class LocalObjectStore {
     }
   }
 
-  complete({ tenant, uploadId, capability, expectedDigest, expectedPartCount }) {
+  complete({
+    tenant,
+    uploadId,
+    capability,
+    expectedDigest,
+    expectedPartCount,
+    expectedPartEtags = null,
+  }) {
     const upload = this._upload(uploadId);
     if (upload.state === 'complete') {
       this._verifyUploadCapability(upload, tenant, capability, { allowCompletedReplay: true });
       if (sha256(capability) !== upload.completionCapabilityDigest) throw new StoreError('DUPLICATE_COMPLETION_CONTEXT');
       if (expectedDigest !== upload.completedDigest || expectedPartCount !== upload.expectedPartCount) {
+        throw new StoreError('DUPLICATE_COMPLETION_CONTEXT');
+      }
+      if (
+        expectedPartEtags !== null &&
+        canonicalJson(expectedPartEtags) !== canonicalJson(upload.completedPartEtags)
+      ) {
         throw new StoreError('DUPLICATE_COMPLETION_CONTEXT');
       }
       return { replayed: true, objectDigest: upload.completedDigest };
@@ -403,6 +437,13 @@ export class LocalObjectStore {
     if (expectedDigest !== upload.expectedDigest) throw new StoreError('DIGEST_MISMATCH');
     if (expectedPartCount !== upload.expectedPartCount || upload.parts.size !== upload.expectedPartCount) {
       throw new StoreError('TRUNCATED_OBJECT');
+    }
+    const partEtags = this._inventory(upload).map((part) => part.ciphertextDigest);
+    if (
+      expectedPartEtags !== null &&
+      (!Array.isArray(expectedPartEtags) || canonicalJson(expectedPartEtags) !== canonicalJson(partEtags))
+    ) {
+      throw new StoreError('ETAG_MISMATCH');
     }
     const hash = createHash('sha256');
     let contentLength = 0;
@@ -437,6 +478,7 @@ export class LocalObjectStore {
     upload.state = 'complete';
     upload.completionCapabilityDigest = sha256(capability);
     upload.completedDigest = computed;
+    upload.completedPartEtags = partEtags;
     return {
       replayed: false,
       objectDigest: computed,
@@ -486,7 +528,7 @@ export class LocalObjectStore {
     let claims;
     try { claims = JSON.parse(payload.toString('utf8')); } catch { throw new StoreError('INVALID_CAPABILITY'); }
     if (claims.kind !== 'read' || claims.version !== 1) throw new StoreError('INVALID_CAPABILITY');
-    if (claims.expiresAtMs < this.clock.now()) throw new StoreError('EXPIRED_CAPABILITY');
+    if (claims.expiresAtMs <= this.clock.now()) throw new StoreError('EXPIRED_CAPABILITY');
     if (claims.tenant !== tenant || object.tenant !== tenant) throw new StoreError('TENANT_SCOPE');
     if (claims.bucket !== object.bucket || claims.objectId !== object.objectId) {
       throw new StoreError('CAPABILITY_CONTEXT_MISMATCH');
@@ -529,6 +571,25 @@ export class LocalObjectStore {
     const previous = Buffer.from(part.ciphertext);
     part.ciphertext[0] ^= 0x01;
     return () => { part.ciphertext = previous; };
+  }
+
+  corruptPartFieldForTest({ tenant, bucket, objectId, partNumber, field }) {
+    const object = this._object(tenant, bucket, objectId);
+    const part = object.parts.get(partNumber);
+    if (!part) throw new StoreError('UNKNOWN_PART');
+    if (!['authTag', 'iv', 'plaintextDigest', 'plaintextLength'].includes(field)) {
+      throw new StoreError('INVALID_TEST_MUTATION');
+    }
+    const previous = Buffer.isBuffer(part[field]) ? Buffer.from(part[field]) : part[field];
+    if (Buffer.isBuffer(part[field])) {
+      part[field] = Buffer.from(part[field]);
+      part[field][0] ^= 0x01;
+    } else if (field === 'plaintextDigest') {
+      part[field] = sha256(`${part[field]}-tampered`);
+    } else {
+      part[field] += 1;
+    }
+    return () => { part[field] = previous; };
   }
 
   rotateKey({ tenant, bucket, objectId, newKeyVersion }) {
