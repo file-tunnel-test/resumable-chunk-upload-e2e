@@ -34,6 +34,10 @@ test('local synthetic suite certifies the full DEN-3431 state machine', async ()
   assert.equal(evidence.integrity.singlePartVerified, true);
   assert.equal(evidence.integrity.rangeVerified, true);
   assert.equal(evidence.integrity.keyRotationVerified, true);
+  assert.equal(evidence.encryption.clientModeMetadataVerified, true);
+  assert.equal(evidence.encryption.serverModeMetadataVerified, true);
+  assert.equal(evidence.encryption.invalidModeRejected, true);
+  assert.equal(evidence.encryption.rawKeyExcluded, true);
   assert.equal(evidence.resume.exactReplayIdempotent, true);
   assert.equal(evidence.resume.reorderedPartRejected, true);
   assert.equal(evidence.resume.expiredCapabilityRejected, true);
@@ -49,6 +53,7 @@ test('local synthetic suite certifies the full DEN-3431 state machine', async ()
   assert.equal(evidence.isolation.namespaceScopedCleanup, true);
   assert.equal(evidence.isolation.crossBucketReadRejected, true);
   assert.equal(evidence.isolation.crossObjectReadRejected, true);
+  assert.equal(evidence.isolation.crossPrefixReadRejected, true);
   assert.equal(evidence.isolation.foreignUploadCapabilityRejected, true);
   assert.equal(evidence.isolation.cacheIsolation, true);
   assert.equal(evidence.resourceBounds.bounded, true);
@@ -90,6 +95,7 @@ test('mutation checks prove integrity, lifecycle, isolation, and bounds are enfo
     (value) => { value.lifecycle.finalDeletionEvidence = 'requested'; },
     (value) => { value.isolation.tenantScopedCleanup = false; },
     (value) => { value.integrity.partialResponseRejected = false; },
+    (value) => { value.encryption.serverModeMetadataVerified = false; },
     (value) => { value.faultInjection.partialResponses = 0; },
     (value) => { value.resourceBounds.peakWorkingSetBytes = value.resourceBounds.maxPartBytes * 3; },
   ];
@@ -97,6 +103,7 @@ test('mutation checks prove integrity, lifecycle, isolation, and bounds are enfo
     value.integrity.tamperDetected === true &&
     value.integrity.wrongEtagRejected === true &&
     value.integrity.partialResponseRejected === true &&
+    value.encryption.serverModeMetadataVerified === true &&
     value.resume.staleCapabilityRejected === true &&
     value.resume.expiredCapabilityRejected === true &&
     value.lifecycle.finalDeletionEvidence === 'verified' &&
@@ -121,6 +128,7 @@ test('v2 evidence schema is closed and declares every emitted certification clai
   assert.deepEqual(Object.keys(evidence).sort(), [...schema.required].sort());
   for (const group of [
     'integrity',
+    'encryption',
     'resume',
     'lifecycle',
     'isolation',
